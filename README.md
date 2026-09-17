@@ -60,13 +60,6 @@ cp .env.example .env         # then add your GitHub token to .env
 python server.py
 ```
 
-### Running the web dashboard
-
-```bash
-uvicorn api:app --reload
-```
-
-Then open http://127.0.0.1:8000
 
 ### Connecting to Claude Desktop
 
