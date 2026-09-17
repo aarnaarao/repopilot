@@ -6,13 +6,6 @@ An MCP (Model Context Protocol) server that gives Claude — or any MCP-compatib
 
 AI assistants are increasingly expected to act on real developer workflows — triaging issues, reviewing PRs, checking build health — without a human copy-pasting data back and forth. RepoPilot demonstrates that pattern end-to-end: a working MCP server that a real AI client (Claude Desktop) can call live, backed by input validation, rate-limit handling, and sane guardrails rather than a naive API wrapper.
 
-## Demo
-
-Claude Desktop calling RepoPilot's `list_open_issues` tool live:
-
-![Claude Desktop using RepoPilot](docs/demo-screenshot.png)
-
-*(Add your screenshot here — see "Adding the demo screenshot" below)*
 
 ## Features
 
