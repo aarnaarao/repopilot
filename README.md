@@ -25,4 +25,84 @@ Claude Desktop calling RepoPilot's `list_open_issues` tool live:
 
 All four tools are also exposed as REST endpoints (`/api/issues`, `/api/pr`, `/api/ci`, `/api/search`) via a small FastAPI layer, with a browser dashboard (`static/index.html`) for manual use.
 
-## Architecture
+
+Both the MCP server and the REST API call the *same* underlying tool functions in `server.py` — no logic duplication between the AI-facing and human-facing interfaces.
+
+## Guardrails & design decisions
+
+- **Repo name validation** — a regex whitelist blocks malformed or path-traversal-style input before any API call is made.
+- **Result capping** — issue lists and PR file lists are capped (e.g. max 30 issues, 15 files shown) to avoid flooding an LLM's context window with a single tool call.
+- **GitHub-aware error handling** — rate limits, 404s, and auth failures are caught and returned as clear, actionable messages instead of raw stack traces.
+- **Known limitation**: GitHub's code search API can return `incomplete_results: true` on very large repositories (e.g. facebook/react) even when the query is valid — this is a documented constraint of GitHub's search index, not a bug in this project. Verified against smaller repos to confirm correct behavior.
+
+## Setup
+
+### Prerequisites
+- Python 3.10+
+- A free [GitHub Personal Access Token](https://github.com/settings/tokens) (classic, `repo` scope is sufficient)
+
+### Installation
+
+```bash
+git clone https://github.com/aarnaarao/repopilot.git
+cd repopilot
+python -m venv venv
+venv\Scripts\activate        # Windows
+# source venv/bin/activate   # macOS/Linux
+
+pip install -r requirements.txt
+cp .env.example .env         # then add your GitHub token to .env
+```
+
+### Running the MCP server standalone
+
+```bash
+python server.py
+```
+
+### Running the web dashboard
+
+```bash
+uvicorn api:app --reload
+```
+
+Then open http://127.0.0.1:8000
+
+### Connecting to Claude Desktop
+
+Add this to your Claude Desktop config file (`claude_desktop_config.json`):
+
+```json
+{
+  "mcpServers": {
+    "repopilot": {
+      "command": "C:\\path\\to\\repopilot\\venv\\Scripts\\python.exe",
+      "args": ["C:\\path\\to\\repopilot\\server.py"],
+      "env": {
+        "GITHUB_TOKEN": "your_token_here"
+      }
+    }
+  }
+}
+```
+
+Restart Claude Desktop, then check **Settings → Developer → Local MCP servers** to confirm it shows as "Running."
+
+## Testing
+
+```bash
+python test_tools.py
+```
+
+Runs all four tools against a real public repo and prints the results, including verifying error handling on invalid input.
+
+## Tech stack
+
+- **fastmcp** — MCP server framework
+- **FastAPI** + **uvicorn** — REST API layer
+- **requests** — GitHub API client
+- Vanilla HTML/CSS/JS — dashboard (no build step required)
+
+## License
+
+MIT
