@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>RepoPilot</title>
+<style>
+  :root {
+    --bg: #0d1117;
+    --panel: #161b22;
+    --border: #30363d;
+    --text: #c9d1d9;
+    --muted: #8b949e;
+    --accent: #58a6ff;
+    --success: #3fb950;
+    --error: #f85149;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+  }
+  header {
+    padding: 24px 32px;
+    border-bottom: 1px solid var(--border);
+  }
+  header h1 {
+    margin: 0;
+    font-size: 22px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  header p {
+    margin: 6px 0 0;
+    color: var(--muted);
+    font-size: 14px;
+  }
+  .repo-bar {
+    display: flex;
+    gap: 10px;
+    padding: 16px 32px;
+    border-bottom: 1px solid var(--border);
+    background: var(--panel);
+  }
+  input {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-size: 14px;
+  }
+  #repoInput { flex: 1; max-width: 320px; }
+  .grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    padding: 24px 32px;
+  }
+  @media (max-width: 800px) {
+    .grid { grid-template-columns: 1fr; }
+  }
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 18px;
+  }
+  .card h2 {
+    margin: 0 0 12px;
+    font-size: 15px;
+    color: var(--accent);
+  }
+  .card-controls {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+  .card-controls input {
+    flex: 1;
+    min-width: 0;
+  }
+  button {
+    background: var(--accent);
+    color: #0d1117;
+    border: none;
+    padding: 8px 14px;
+    border-radius: 6px;
+    font-weight: 600;
+    font-size: 13px;
+    cursor: pointer;
+  }
+  button:hover { opacity: 0.85; }
+  pre {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 12px;
+    white-space: pre-wrap;
+    word-break: break-word;
+    font-size: 13px;
+    max-height: 260px;
+    overflow-y: auto;
+    color: var(--text);
+    min-height: 60px;
+  }
+  .status { font-size: 12px; margin-bottom: 8px; color: var(--muted); }
+  .status.error { color: var(--error); }
+  .status.ok { color: var(--success); }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🧭 RepoPilot</h1>
+  <p>A read-only dashboard for GitHub repo insight — issues, PRs, CI status, and code search.</p>
+</header>
+
+<div class="repo-bar">
+  <input id="repoInput" type="text" placeholder="owner/repo (e.g. facebook/react)" value="facebook/react" />
+</div>
+
+<div class="grid">
+
+  <div class="card">
+    <h2>Open Issues</h2>
+    <div class="card-controls">
+      <input id="issuesLimit" type="number" value="5" min="1" max="30" style="max-width:70px" />
+      <button onclick="loadIssues()">Fetch</button>
+    </div>
+    <div id="issuesStatus" class="status"></div>
+    <pre id="issuesOutput">Results will appear here.</pre>
+  </div>
+
+  <div class="card">
+    <h2>CI Status</h2>
+    <div class="card-controls">
+      <input id="ciRef" type="text" placeholder="branch or SHA" value="main" />
+      <button onclick="loadCI()">Fetch</button>
+    </div>
+    <div id="ciStatus" class="status"></div>
+    <pre id="ciOutput">Results will appear here.</pre>
+  </div>
+
+  <div class="card">
+    <h2>Code Search</h2>
+    <div class="card-controls">
+      <input id="searchQuery" type="text" placeholder="e.g. useState" />
+      <button onclick="loadSearch()">Search</button>
+    </div>
+    <div id="searchStatus" class="status"></div>
+    <pre id="searchOutput">Results will appear here.</pre>
+  </div>
+
+  <div class="card">
+    <h2>PR Summary</h2>
+    <div class="card-controls">
+      <input id="prNumber" type="number" placeholder="PR number" style="max-width:110px" />
+      <button onclick="loadPR()">Fetch</button>
+    </div>
+    <div id="prStatus" class="status"></div>
+    <pre id="prOutput">Results will appear here.</pre>
+  </div>
+
+</div>
+
+<script>
+  function currentRepo() {
+    return document.getElementById('repoInput').value.trim();
+  }
+
+  async function callApi(path, params, statusEl, outputEl) {
+    const statusDiv = document.getElementById(statusEl);
+    const outputPre = document.getElementById(outputEl);
+    statusDiv.textContent = 'Loading...';
+    statusDiv.className = 'status';
+    outputPre.textContent = '';
+
+    const url = new URL(path, window.location.origin);
+    Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
+
+    try {
+      const resp = await fetch(url);
+      const data = await resp.json();
+
+      if (!resp.ok) {
+        statusDiv.textContent = `Error (${resp.status})`;
+        statusDiv.className = 'status error';
+        outputPre.textContent = data.detail || 'Unknown error';
+        return;
+      }
+
+      statusDiv.textContent = 'Success';
+      statusDiv.className = 'status ok';
+      outputPre.textContent = data.result;
+    } catch (err) {
+      statusDiv.textContent = 'Network error';
+      statusDiv.className = 'status error';
+      outputPre.textContent = String(err);
+    }
+  }
+
+  function loadIssues() {
+    const limit = document.getElementById('issuesLimit').value || 10;
+    callApi('/api/issues', { repo: currentRepo(), limit }, 'issuesStatus', 'issuesOutput');
+  }
+
+  function loadCI() {
+    const ref = document.getElementById('ciRef').value || 'main';
+    callApi('/api/ci', { repo: currentRepo(), ref }, 'ciStatus', 'ciOutput');
+  }
+
+  function loadSearch() {
+    const query = document.getElementById('searchQuery').value;
+    if (!query) return;
+    callApi('/api/search', { repo: currentRepo(), query }, 'searchStatus', 'searchOutput');
+  }
+
+  function loadPR() {
+    const pr_number = document.getElementById('prNumber').value;
+    if (!pr_number) return;
+    callApi('/api/pr', { repo: currentRepo(), pr_number }, 'prStatus', 'prOutput');
+  }
+</script>
+
+</body>
+</html>
